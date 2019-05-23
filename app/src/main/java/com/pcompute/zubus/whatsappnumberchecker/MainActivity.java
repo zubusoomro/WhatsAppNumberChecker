@@ -59,25 +59,30 @@ public class MainActivity extends AppCompatActivity {
         textView = findViewById(R.id.tv_hasWhatsapp);
         btnSearch = findViewById(R.id.btn_search);
         try {
+            //Setting app's version in the text field
             PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
             String versionName = pInfo.versionName;
             version.setText("WhatsApp Number Checker V-" + versionName);
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
+
+        //search button when clicked
         btnSearch.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                //Checking for android version for runtime permission
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    //Checking for contacts permission
                     if (checkSelfPermission(Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
                         dotheDeed();
                     } else {
+                        //Requesting runtime permission
                         helper = new PermissionHelper(MainActivity.this);
                         helper.check(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)
                                 .onSuccess(new Runnable() {
                                     @Override
                                     public void run() {
-//                                        dotheDeed();
                                         Toast.makeText(MainActivity.this, "Permission Granted!! Please press the button again to execute your request!", Toast.LENGTH_LONG).show();
                                     }
                                 }).
@@ -149,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
             textView.setText("");
             check = 0;
             for (int i = 0; i <= 3; i++) {
-
+                //Adding + searching number
                 addNumber(n, i);
             }
         }
@@ -209,14 +214,11 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
 
-
-                //insert contact withoutRowId
-//                boolean contactAdded = insertContact();
-
-                //use ContactId globalVariable for contact for this
+                //Inserting contact
                 boolean contactAdded = insertContactother();
 
 
+                //force syncing Whatsapp Service to sync the contact
                 Bundle bundle = new Bundle();
                 bundle.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
                 bundle.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
@@ -236,23 +238,16 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 final String Authority = "com.android.contacts";
-//                if (contactAdded) {
-//                    if (!ContentResolver.isSyncPending(whatsappAccount, Authority) && !ContentResolver.isSyncActive(whatsappAccount, Authority)) {
-//                        ContentResolver.cancelSync(whatsappAccount, Authority);
-//                    }
                 ContentResolver.requestSync(whatsappAccount, Authority, bundle);
-//                }
                 final Account finalWhatsappAccount = whatsappAccount;
                 do {
+                    //waiting for the sync servie to complete
                     if (!ContentResolver.isSyncPending(finalWhatsappAccount, Authority) && !ContentResolver.isSyncActive(finalWhatsappAccount, Authority)) {
                         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
                             @Override
                             public void run() {
-
-
+                                //setting text whether number have whatsapp or not
                                 setTextViewText(fetchWhatsAppContacts(), i);
-//                                String contactId = getContactId(phoneNumber, addedNumbers.get(phoneNumber));
-//                                setTextViewText(hasWhatsapp(String.valueOf(contactId)), i);
                             }
                         }, 10000);
                         break;
@@ -289,69 +284,6 @@ public class MainActivity extends AppCompatActivity {
         // Add contact phone data.
         insertContactPhoneNumber(addContactsUri, contactId, MobileNumber);
         addedNumbers.put(MobileNumber, DisplayName);
-        return true;
-    }
-
-    private boolean insertContact() {
-        String DisplayName = displayName + System.currentTimeMillis();
-        String MobileNumber = number.getText().toString().trim();
-        if (addedNumbers.containsKey(MobileNumber))
-            return false;
-
-        Log.d("Add Contact", DisplayName + " " + MobileNumber);
-        String emailID = "email@nomail.com";
-
-        ArrayList<ContentProviderOperation> ops = new ArrayList<ContentProviderOperation>();
-
-        ops.add(ContentProviderOperation.newInsert(
-                ContactsContract.RawContacts.CONTENT_URI)
-                .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
-                .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
-                .build());
-
-        //------------------------------------------------------ Names
-
-        ops.add(ContentProviderOperation.newInsert(
-                ContactsContract.Data.CONTENT_URI)
-                .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                .withValue(ContactsContract.Data.MIMETYPE,
-                        ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
-                .withValue(
-                        ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME,
-                        DisplayName).build());
-
-
-        //------------------------------------------------------ Mobile Number
-
-        ops.add(ContentProviderOperation.
-                newInsert(ContactsContract.Data.CONTENT_URI)
-                .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                .withValue(ContactsContract.Data.MIMETYPE,
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.Phone.NUMBER, MobileNumber)
-                .withValue(ContactsContract.CommonDataKinds.Phone.TYPE,
-                        ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE)
-                .build());
-
-
-        //------------------------------------------------------ Email
-
-        ops.add(ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
-                .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-                .withValue(ContactsContract.Data.MIMETYPE,
-                        ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE)
-                .withValue(ContactsContract.CommonDataKinds.Email.DATA, emailID)
-                .withValue(ContactsContract.CommonDataKinds.Email.TYPE, ContactsContract.CommonDataKinds.Email.TYPE_WORK)
-                .build());
-
-
-        // Asking the Contact provider to create a new contact
-        try {
-            ContentProviderResult[] result = getContentResolver().applyBatch(ContactsContract.AUTHORITY, ops);
-            addedNumbers.put(MobileNumber, DisplayName);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
         return true;
     }
 
@@ -404,53 +336,6 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-
-    public boolean hasWhatsapp(String contactID) {
-        String rowContactId = null;
-        boolean hasWhatsApp;
-
-        String[] projection = new String[]{ContactsContract.RawContacts._ID};
-        String selection = ContactsContract.Data.CONTACT_ID + " = ? AND account_type IN (?)";
-        String[] selectionArgs = new String[]{contactID, "com.whatsapp"};
-        Cursor cursor = getContentResolver().query(ContactsContract.RawContacts.CONTENT_URI, projection, selection, selectionArgs, null);
-
-        if (cursor != null) {
-            hasWhatsApp = cursor.moveToNext();
-            if (hasWhatsApp) {
-                rowContactId = cursor.getString(0);
-            }
-            cursor.close();
-        }
-        return rowContactId != null;
-    }
-
-    private String getContactId(String phoneNumber, String DisplayName) {
-        String contactId = null;
-        ContentResolver contentResolver = getContentResolver();
-
-        Uri uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(phoneNumber));
-
-        String[] projection = new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup._ID};
-
-        Cursor cursor =
-                contentResolver.query(
-                        uri,
-                        projection,
-                        null,
-                        null,
-                        null);
-
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                String contactName = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.PhoneLookup.DISPLAY_NAME));
-                if (contactName.equalsIgnoreCase(DisplayName))
-                    contactId = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.PhoneLookup._ID));
-            }
-        }
-        if (cursor != null)
-            cursor.close();
-        return contactId;
-    }
 
     private boolean fetchWhatsAppContacts() {
         boolean numberFound = false;
